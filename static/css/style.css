@@ -1,0 +1,62 @@
+body {
+    background-color: #ffffff;
+    font-family: 'Arial', sans-serif;
+}
+.navbar {
+    background-color: #add8e6 !important;
+    color: #333 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.navbar-nav .nav-link {
+    color: #333 !important;
+}
+.navbar-nav .nav-link:hover {
+    color: #007bff !important;
+}
+.card {
+    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.form-control.is-invalid {
+    border-color: #dc3545;
+}
+.form-control.is-valid {
+    border-color: #28a745;
+}
+footer {
+    background-color: #add8e6;
+    color: #333;
+    padding: 20px 0;
+    margin-top: 40px;
+    border-top: 1px solid #ddd;
+}
+.dropzone {
+    border: 2px dashed #007bff;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+.dropzone.active {
+    border-color: #28a745;
+}
+.dropdown-submenu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    min-width: 200px;
+    display: none;
+}
+.dropdown:hover .dropdown-submenu {
+    display: block;
+}
+.toast {
+    background-color: #fff;
+    border: 1px solid rgba(0,0,0,.1);
+    border-radius: 0.25rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+}

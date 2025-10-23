@@ -1,0 +1,11 @@
+{% for product in recommendations %}
+<div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+    <div class="toast-header">
+        <strong class="me-auto">Rekomandim për Ty</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body">
+        Shiko: <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a> - {{ product.price }} €
+    </div>
+</div>
+{% endfor %}

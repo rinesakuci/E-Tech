@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Karroca Juaj</h1>
+{% if cart_items %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Produkti</th>
+            <th>Çmimi</th>
+            <th>Sasia</th>
+            <th>Total</th>
+            <th>Veprime</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in cart_items %}
+        <tr>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.product.price }} €</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ (item.product.price * item.quantity) | round(2) }} €</td>
+            <td>
+                <a href="{{ url_for('remove_from_cart', cart_id=item.id) }}" class="btn btn-danger btn-sm">Hiq</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<h3>Totali: {{ total | round(2) }} €</h3>
+<button class="btn btn-success">Blej Tani</button> <!-- Placeholder for checkout -->
+{% else %}
+<p>Karroca juaj është bosh.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-lg">
+            <div class="row g-0">
+                <div class="col-md-4">
+                    {% if product.image_filename %}
+                    <img src="{{ url_for('static', filename='uploads/' + product.image_filename) }}" class="img-fluid rounded-start" alt="{{ product.name }}" style="height: 100%; object-fit: cover;">
+                    {% else %}
+                    <img src="https://via.placeholder.com/400x400?text={{ product.name }}" class="img-fluid rounded-start" alt="{{ product.name }}" style="height: 100%; object-fit: cover;">
+                    {% endif %}
+                </div>
+                <div class="col-md-8">
+                    <div class="card-body">
+                        <h1 class="card-title">{{ product.name }}</h1>
+                        <p class="card-text">{{ product.description }}</p>
+                        <p class="card-text"><strong>Nën-Kategoria:</strong> {{ product.subcategory.name if product.subcategory else 'Pa Nën-Kategori' }}</p>
+                        <p class="card-text"><strong>Kategoria:</strong> {{ product.subcategory.category.name if product.subcategory else 'Pa Kategori' }}</p>
+                        <p class="card-text"><strong>Çmimi:</strong> {{ product.price }} €</p>
+                        {% if current_user.is_authenticated %}
+                            <form method="post" action="{{ url_for('add_to_cart', product_id=product.id) }}">
+                                <button type="submit" class="btn btn-primary btn-lg">Shto në Karrocë</button>
+                            </form>
+                        {% else %}
+                            <p><a href="{{ url_for('login') }}" class="btn btn-secondary">Logohu</a> për të shtuar në karrocë.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

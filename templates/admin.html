@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <h1>Paneli i Admin-it</h1>
+
+    <!-- Menaxhimi i Perdoruesve -->
+    <h3>Përdorues</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Emri i Përdoruesit</th>
+                <th>Email</th>
+                <th>Admin</th>
+                <th>Veprime</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.email }}</td>
+                <td>{{ 'Po' if user.is_admin else 'Jo' }}</td>
+                <td>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editUserModal{{ user.id }}">Ndrysho</button>
+                    <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('A je i sigurt?');">Fshi</button>
+                    </form>
+                    {% if not user.is_admin %}
+                    <form method="post" action="{{ url_for('make_admin', user_id=user.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('A je i sigurt që dëshiron të bësh këtë përdorues admin?');">Bëj Admin</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <h4>Shto Përdorues të Ri</h4>
+    <form method="post" action="{{ url_for('add_user') }}">
+        <div class="mb-3">
+            <label class="form-label">Emri i Përdoruesit</label>
+            <input type="text" class="form-control" name="username" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Fjalëkalimi</label>
+            <input type="password" class="form-control" name="password" required>
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" name="is_admin" id="isAdmin">
+            <label class="form-check-label" for="isAdmin">Admin</label>
+        </div>
+        <button type="submit" class="btn btn-primary">Shto Përdorues</button>
+    </form>
+
+    <!-- Modalet per Edit User -->
+    {% for user in users %}
+    <div class="modal fade" id="editUserModal{{ user.id }}" tabindex="-1" aria-labelledby="editUserLabel{{ user.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUserLabel{{ user.id }}">Ndrysho Përdorues: {{ user.username }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" action="{{ url_for('edit_user', user_id=user.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Emri i Përdoruesit</label>
+                            <input type="text" class="form-control" name="username" value="{{ user.username }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Fjalëkalimi (lëre bosh për të mos ndryshuar)</label>
+                            <input type="password" class="form-control" name="password">
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" name="is_admin" id="isAdmin{{ user.id }}" {% if user.is_admin %}checked{% endif %}>
+                            <label class="form-check-label" for="isAdmin{{ user.id }}">Admin</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ruaj Ndryshimet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Menaxhimi i Produkteve -->
+    <h3>Produkte</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Emri</th>
+                <th>Nën-Kategoria</th>
+                <th>Çmimi</th>
+                <th>Veprime</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product.id }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.subcategory.name if product.subcategory else 'Pa Nën-Kategori' }}</td>
+                <td>{{ product.price }} €</td>
+                <td>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editProductModal{{ product.id }}">Ndrysho</button>
+                    <form method="post" action="{{ url_for('delete_product', product_id=product.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('A je i sigurt?');">Fshi</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <h4>Shto Produkt</h4>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('add_product') }}">
+        <div class="mb-3">
+            <label class="form-label">Emri i Produktit</label>
+            <input type="text" class="form-control" name="name" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Përshkrimi</label>
+            <textarea class="form-control" name="description" rows="3" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Nën-Kategoria (shkruaj emrin; duhet të ekzistojë)</label>
+            <input type="text" class="form-control" name="subcategory" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Çmimi</label>
+            <input type="number" step="0.01" class="form-control" name="price" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Tags (opsionale, e ndara me presje)</label>
+            <input type="text" class="form-control" name="tags">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Foto (opsionale)</label>
+            <input type="file" class="form-control" name="image">
+        </div>
+        <button type="submit" class="btn btn-primary">Shto Produkt</button>
+    </form>
+
+    <!-- Modalet per Edit Product -->
+    {% for product in products %}
+    <div class="modal fade" id="editProductModal{{ product.id }}" tabindex="-1" aria-labelledby="editProductLabel{{ product.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editProductLabel{{ product.id }}">Ndrysho Produkt: {{ product.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" enctype="multipart/form-data" action="{{ url_for('edit_product', product_id=product.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Emri</label>
+                            <input type="text" class="form-control" name="name" value="{{ product.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Përshkrimi</label>
+                            <textarea class="form-control" name="description" rows="3" required>{{ product.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nën-Kategoria</label>
+                            <input type="text" class="form-control" name="subcategory" value="{{ product.subcategory.name if product.subcategory else '' }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Çmimi</label>
+                            <input type="number" step="0.01" class="form-control" name="price" value="{{ product.price }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tags</label>
+                            <input type="text" class="form-control" name="tags" value="{{ product.tags }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Foto (lëre bosh për të mos ndryshuar)</label>
+                            <input type="file" class="form-control" name="image">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ruaj Ndryshimet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Menaxhimi i Kategorive -->
+    <h3>Kategori Kryesore</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Emri</th>
+                <th>Veprime</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for category in categories %}
+            <tr>
+                <td>{{ category.id }}</td>
+                <td>{{ category.name }}</td>
+                <td>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editCategoryModal{{ category.id }}">Ndrysho</button>
+                    <form method="post" action="{{ url_for('delete_category', category_id=category.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('A je i sigurt? Kjo mund të ndikojë nën-kategoritë.');">Fshi</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <h4>Shto Kategori të Re</h4>
+    <form method="post" action="{{ url_for('add_category') }}">
+        <div class="mb-3">
+            <label class="form-label">Emri i Kategorisë</label>
+            <input type="text" class="form-control" name="name" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Shto Kategori</button>
+    </form>
+
+    <!-- Modalet per Edit Category -->
+    {% for category in categories %}
+    <div class="modal fade" id="editCategoryModal{{ category.id }}" tabindex="-1" aria-labelledby="editCategoryLabel{{ category.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editCategoryLabel{{ category.id }}">Ndrysho Kategori: {{ category.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" action="{{ url_for('edit_category', category_id=category.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Emri</label>
+                            <input type="text" class="form-control" name="name" value="{{ category.name }}" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ruaj Ndryshimet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Menaxhimi i Nen-Kategorive -->
+    <h3>Nën-Kategori</h3>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Emri</th>
+                <th>Kategoria Kryesore</th>
+                <th>Veprime</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for subcategory in subcategories %}
+            <tr>
+                <td>{{ subcategory.id }}</td>
+                <td>{{ subcategory.name }}</td>
+                <td>{{ subcategory.category.name }}</td>
+                <td>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editSubcategoryModal{{ subcategory.id }}">Ndrysho</button>
+                    <form method="post" action="{{ url_for('delete_subcategory', subcategory_id=subcategory.id) }}" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('A je i sigurt? Kjo mund të ndikojë produktet.');">Fshi</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <h4>Shto Nën-Kategori të Re</h4>
+    <form method="post" action="{{ url_for('add_subcategory') }}">
+        <div class="mb-3">
+            <label class="form-label">Emri i Nën-Kategorisë</label>
+            <input type="text" class="form-control" name="name" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Kategoria Kryesore (shkruaj emrin)</label>
+            <input type="text" class="form-control" name="category" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Shto Nën-Kategori</button>
+    </form>
+
+    <!-- Modalet per Edit Subcategory -->
+    {% for subcategory in subcategories %}
+    <div class="modal fade" id="editSubcategoryModal{{ subcategory.id }}" tabindex="-1" aria-labelledby="editSubcategoryLabel{{ subcategory.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editSubcategoryLabel{{ subcategory.id }}">Ndrysho Nën-Kategori: {{ subcategory.name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" action="{{ url_for('edit_subcategory', subcategory_id=subcategory.id) }}">
+                        <div class="mb-3">
+                            <label class="form-label">Emri</label>
+                            <input type="text" class="form-control" name="name" value="{{ subcategory.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kategoria Kryesore</label>
+                            <input type="text" class="form-control" name="category" value="{{ subcategory.category.name }}" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ruaj Ndryshimet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
