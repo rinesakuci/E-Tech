@@ -29,7 +29,7 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# ================== ALGORITMI I REKOMANDIMEVE (I QËNDRUESHËM) ==================
+
 @lru_cache(maxsize=1)
 def get_tfidf_vectors():
     all_products = Product.query.all()
@@ -42,13 +42,13 @@ def get_tfidf_vectors():
 
 
 def get_recommendations(user=None, limit=5):
-    # ---------- 1. Përdorues i paautentikuar ----------
+
     if not user or not user.is_authenticated:
         recs = Product.query.order_by(db.func.rand()).limit(limit).all()
         print(f"[DEBUG] Përdorues i paautentikuar → Random: {[p.name for p in recs]}")
         return recs
 
-    # ---------- 2. Përdorues pa histori ----------
+
     profile = UserProfile.query.filter_by(user_id=user.id).first()
     if not profile or not profile.viewed_products:
         popular = (
@@ -75,14 +75,14 @@ def get_recommendations(user=None, limit=5):
         print(f"[DEBUG] User {user.id} ({user.username}) pa histori → Popullore: {[p.name for p in recs]}")
         return recs
 
-    # ---------- 3. Merr TF-IDF (cache) ----------
+
     all_products, product_vectors_sparse, vectorizer = get_tfidf_vectors()
     if not all_products or product_vectors_sparse is None:
         recs = Product.query.order_by(db.func.rand()).limit(limit).all()
         print(f"[DEBUG] User {user.id} → TF-IDF dështoi → Random: {[p.name for p in recs]}")
         return recs
 
-    # ---------- 4. Produkti i shikuar ----------
+
     viewed_products = [p for p in profile.viewed_products if p in all_products]
     if not viewed_products:
         recs = Product.query.order_by(db.func.rand()).limit(limit).all()
@@ -93,17 +93,17 @@ def get_recommendations(user=None, limit=5):
     viewed_vectors = product_vectors_sparse[viewed_indices]  # sparse
     user_vector_sparse = viewed_vectors.mean(axis=0)  # sparse 1xN
 
-    # ---------- 5. Konverto në dense për cosine_similarity ----------
+
     product_vectors_dense = product_vectors_sparse.toarray()  # (N, features)
     user_vector_dense = np.asarray(user_vector_sparse).ravel()  # (features,)
 
-    # Sigurohu që forma është (1, features)
+
     user_vector_dense = user_vector_dense.reshape(1, -1)
 
-    # ---------- 6. Content-based (cosine) ----------
+
     content_sim = cosine_similarity(user_vector_dense, product_vectors_dense)[0]
 
-    # ---------- 7. Collaborative (Jaccard) ----------
+
     user_viewed_set = {p.id for p in viewed_products}
     collab_scores = np.zeros(len(all_products))
 
@@ -124,10 +124,10 @@ def get_recommendations(user=None, limit=5):
     if collab_scores.max() > 0:
         collab_scores = collab_scores / collab_scores.max()
 
-    # ---------- 8. Hybrid ----------
+
     hybrid_scores = 0.6 * content_sim + 0.4 * collab_scores
 
-    # ---------- 9. Hiq produktet e shikuara ----------
+
     available_idx = [
         i for i in range(len(all_products))
         if all_products[i].id not in user_viewed_set
@@ -141,7 +141,7 @@ def get_recommendations(user=None, limit=5):
     top_idx = np.argsort(scores_avail)[-limit:][::-1]
     recommended = [all_products[available_idx[i]] for i in top_idx]
 
-    # ---------- 10. Fallback ----------
+
     if len(recommended) < limit:
         remaining = limit - len(recommended)
         used_ids = [p.id for p in recommended + viewed_products]
@@ -156,7 +156,7 @@ def get_recommendations(user=None, limit=5):
     final = recommended[:limit]
     print(f"[DEBUG] User {user.id} ({user.username}) → Finale: {[p.name for p in final]}")
     return final
-# ==============================================================================
+
 
 @app.context_processor
 def inject_categories():
@@ -168,7 +168,7 @@ def home():
     recommendations = get_recommendations(current_user if current_user.is_authenticated else None)
     return render_template('home.html', recommendations=recommendations, products=products)
 
-# ... (të gjitha routet e tjera mbeten të njëjta si në versionin e fundit) ...
+
 
 @app.route('/category/<cat>')
 def category(cat):
