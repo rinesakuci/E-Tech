@@ -3,12 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from models import User, Product, Category, Subcategory, UserProfile, Cart, db
+from models import User, Product, Category, Subcategory, UserProfile, Cart, db, user_profile_viewed_products
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from dotenv import load_dotenv
 import os
+from functools import lru_cache
 
 load_dotenv()
 
@@ -28,43 +29,134 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-def get_recommendations(user=None):
-    if not user:
-        return Product.query.order_by(db.func.rand()).limit(5).all()
-
-    profile = UserProfile.query.filter_by(user_id=user.id).first()
-    if not profile or not profile.viewed_products:
-        return Product.query.order_by(db.func.rand()).limit(5).all()
-
+# ================== ALGORITMI I REKOMANDIMEVE (I QËNDRUESHËM) ==================
+@lru_cache(maxsize=1)
+def get_tfidf_vectors():
     all_products = Product.query.all()
     if not all_products:
-        return []
+        return [], None, None
+    texts = [f"{p.description} {p.tags or ''}" for p in all_products]
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=1000, ngram_range=(1, 2))
+    vectors = vectorizer.fit_transform(texts)  # sparse matrix
+    return all_products, vectors, vectorizer
 
-    vectorizer = TfidfVectorizer()
-    product_vectors = vectorizer.fit_transform([p.description + ' ' + (p.tags or '') for p in all_products])
-    viewed_indices = [all_products.index(p) for p in profile.viewed_products if p in all_products]
-    if not viewed_indices:
-        return Product.query.order_by(db.func.rand()).limit(5).all()
-    viewed_vectors = [product_vectors[i].toarray()[0] for i in viewed_indices]
-    user_vector = np.mean(viewed_vectors, axis=0)
-    content_sim = cosine_similarity([user_vector], product_vectors.toarray())[0]
 
-    all_profiles = UserProfile.query.all()
-    user_viewed_set = set(p.id for p in profile.viewed_products)
+def get_recommendations(user=None, limit=5):
+    # ---------- 1. Përdorues i paautentikuar ----------
+    if not user or not user.is_authenticated:
+        recs = Product.query.order_by(db.func.rand()).limit(limit).all()
+        print(f"[DEBUG] Përdorues i paautentikuar → Random: {[p.name for p in recs]}")
+        return recs
+
+    # ---------- 2. Përdorues pa histori ----------
+    profile = UserProfile.query.filter_by(user_id=user.id).first()
+    if not profile or not profile.viewed_products:
+        popular = (
+            db.session.query(
+                user_profile_viewed_products.c.product_id,
+                db.func.count().label('views')
+            )
+            .group_by(user_profile_viewed_products.c.product_id)
+            .order_by(db.desc('views'))
+            .limit(limit)
+            .all()
+        )
+        product_ids = [p[0] for p in popular]
+        recs = Product.query.filter(Product.id.in_(product_ids)).all()
+        if len(recs) < limit:
+            fallback = (
+                Product.query.filter(~Product.id.in_(product_ids))
+                .order_by(db.func.rand())
+                .limit(limit - len(recs))
+                .all()
+            )
+            recs.extend(fallback)
+        recs = recs[:limit]
+        print(f"[DEBUG] User {user.id} ({user.username}) pa histori → Popullore: {[p.name for p in recs]}")
+        return recs
+
+    # ---------- 3. Merr TF-IDF (cache) ----------
+    all_products, product_vectors_sparse, vectorizer = get_tfidf_vectors()
+    if not all_products or product_vectors_sparse is None:
+        recs = Product.query.order_by(db.func.rand()).limit(limit).all()
+        print(f"[DEBUG] User {user.id} → TF-IDF dështoi → Random: {[p.name for p in recs]}")
+        return recs
+
+    # ---------- 4. Produkti i shikuar ----------
+    viewed_products = [p for p in profile.viewed_products if p in all_products]
+    if not viewed_products:
+        recs = Product.query.order_by(db.func.rand()).limit(limit).all()
+        print(f"[DEBUG] User {user.id} → Asnjë produkt i shikuar → Random: {[p.name for p in recs]}")
+        return recs
+
+    viewed_indices = [all_products.index(p) for p in viewed_products]
+    viewed_vectors = product_vectors_sparse[viewed_indices]  # sparse
+    user_vector_sparse = viewed_vectors.mean(axis=0)  # sparse 1xN
+
+    # ---------- 5. Konverto në dense për cosine_similarity ----------
+    product_vectors_dense = product_vectors_sparse.toarray()  # (N, features)
+    user_vector_dense = np.asarray(user_vector_sparse).ravel()  # (features,)
+
+    # Sigurohu që forma është (1, features)
+    user_vector_dense = user_vector_dense.reshape(1, -1)
+
+    # ---------- 6. Content-based (cosine) ----------
+    content_sim = cosine_similarity(user_vector_dense, product_vectors_dense)[0]
+
+    # ---------- 7. Collaborative (Jaccard) ----------
+    user_viewed_set = {p.id for p in viewed_products}
     collab_scores = np.zeros(len(all_products))
-    for other_profile in all_profiles:
-        if other_profile.user_id == user.id:
-            continue
-        other_viewed_set = set(p.id for p in other_profile.viewed_products)
-        common = len(user_viewed_set & other_viewed_set)
-        if common > 0:
-            for p in other_profile.viewed_products:
-                if p.id not in user_viewed_set:
-                    collab_scores[all_products.index(p)] += common
 
-    hybrid_scores = (content_sim + collab_scores) / 2
-    recommended_indices = hybrid_scores.argsort()[-6:-1][::-1]
-    return [all_products[i] for i in recommended_indices if all_products[i] not in profile.viewed_products]
+    for other in UserProfile.query.filter(UserProfile.user_id != user.id).all():
+        if not other.viewed_products:
+            continue
+        other_set = {p.id for p in other.viewed_products}
+        inter = len(user_viewed_set & other_set)
+        union = len(user_viewed_set | other_set)
+        if union == 0:
+            continue
+        jaccard = inter / union
+        for p in other.viewed_products:
+            if p.id not in user_viewed_set and p in all_products:
+                idx = all_products.index(p)
+                collab_scores[idx] += jaccard
+
+    if collab_scores.max() > 0:
+        collab_scores = collab_scores / collab_scores.max()
+
+    # ---------- 8. Hybrid ----------
+    hybrid_scores = 0.6 * content_sim + 0.4 * collab_scores
+
+    # ---------- 9. Hiq produktet e shikuara ----------
+    available_idx = [
+        i for i in range(len(all_products))
+        if all_products[i].id not in user_viewed_set
+    ]
+    if not available_idx:
+        recs = Product.query.order_by(db.func.rand()).limit(limit).all()
+        print(f"[DEBUG] User {user.id} → Të gjitha të shikuara → Random: {[p.name for p in recs]}")
+        return recs
+
+    scores_avail = hybrid_scores[available_idx]
+    top_idx = np.argsort(scores_avail)[-limit:][::-1]
+    recommended = [all_products[available_idx[i]] for i in top_idx]
+
+    # ---------- 10. Fallback ----------
+    if len(recommended) < limit:
+        remaining = limit - len(recommended)
+        used_ids = [p.id for p in recommended + viewed_products]
+        fallback = (
+            Product.query.filter(~Product.id.in_(used_ids))
+            .order_by(db.func.rand())
+            .limit(remaining)
+            .all()
+        )
+        recommended.extend(fallback)
+
+    final = recommended[:limit]
+    print(f"[DEBUG] User {user.id} ({user.username}) → Finale: {[p.name for p in final]}")
+    return final
+# ==============================================================================
 
 @app.context_processor
 def inject_categories():
@@ -75,6 +167,8 @@ def home():
     products = Product.query.all()
     recommendations = get_recommendations(current_user if current_user.is_authenticated else None)
     return render_template('home.html', recommendations=recommendations, products=products)
+
+# ... (të gjitha routet e tjera mbeten të njëjta si në versionin e fundit) ...
 
 @app.route('/category/<cat>')
 def category(cat):
