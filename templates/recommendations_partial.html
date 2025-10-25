@@ -1,11 +1,16 @@
+{% if recommendations %}
 {% for product in recommendations %}
-<div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-    <div class="toast-header">
-        <strong class="me-auto">Rekomandim për Ty</strong>
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body">
-        Shiko: <a href="{{ url_for('product_detail', product_id=product.id) }}">{{ product.name }}</a> - {{ product.price }} €
+<div class="toast align-items-center text-white bg-primary border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="7000">
+    <div class="d-flex">
+        <div class="toast-body">
+            <strong>Rekomandim i ri:</strong> {{ product.name }} - {{ product.price }} €<br>
+            <small>{{ product.description[:50] }}...</small><br>
+            <a href="{{ url_for('product_detail', product_id=product.id) }}" class="text-white">Shiko tani</a>
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
     </div>
 </div>
 {% endfor %}
+{% else %}
+<!-- Fallback nëse nuk ka rekomandime -->
+{% endif %}
